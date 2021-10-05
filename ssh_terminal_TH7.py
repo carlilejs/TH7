@@ -6,7 +6,7 @@ import spidev
 import time
 import datetime
 import RPi.GPIO as GPIO
-import numpy as np
+import numpy
 import logging
 from thermocouples import * 
 
@@ -36,6 +36,7 @@ GPIO.output(17,GPIO.LOW) # D3 LED ON
 kk=0
 pcb_temp = 25.0
 channels = [0,0,0,0,0,0,0,0]
+
 class Thermocouple_Channel:
 
     def __init__(self, channel, filter_level=0, thermocouple_type="uv", offset=0.0, gain=106.2):
@@ -46,16 +47,16 @@ class Thermocouple_Channel:
         self.offset = offset 
         self.value_uv = 0.0
         self.gain = gain
-	self.value_c = -300.0
+        self.value_c = -300.0
 
 
 # references/pointers to thermocouple_channel objects are stored here
-thermocouples = np.array([0, 0, 0, 0, 0, 0, 0], dtype=object)
+thermocouples = numpy.array([0, 0, 0, 0, 0, 0, 0], dtype=object)
 
 # initialise array/list with 7 "blanks"
 for i in range(0, 7):
     # filter level = -1 indicates the channel is `blank'
-    thermocouples[i] = Thermocouple_Channel(i+1, 2, "R", 0)
+    thermocouples[i] = Thermocouple_Channel(i + 1, -1, "R", 0)
 
 
 
@@ -65,69 +66,63 @@ for i in range(0, 7):
 # 3rd is the T/C type as 1 upper-case character;
 # currently supporting types: K, T, J, N, E, B, S
 
-
-# channel, filter level, type, offset (in oC), gain (default 106)
-
-# channel 1...
 # thermocouples[0] = Thermocouple_Channel(1, 2, "K", -2.5, 106.8) # for example to adjust the offset to -2.5oC and the gain to 106.8
-thermocouples[1] = Thermocouple_Channel(2, 2, "K",  0.0)
-# channel 2...
-thermocouples[1] = Thermocouple_Channel(2, 2, "K",  0.0)
-# channel 3...
-thermocouples[2] = Thermocouple_Channel(3, 2, "K", 0.0 )
-# channel 4...
-thermocouples[3] = Thermocouple_Channel(4, 2, "K", 0.0)
-# channel 5...
-thermocouples[4] = Thermocouple_Channel(5, 2, "K", 0.0)
-# channel 6...
-thermocouples[5] = Thermocouple_Channel(6, 2, "K", 0.0)
-# channel 7.
-thermocouples[6] = Thermocouple_Channel(7, 2, "K", 0.0)
+thermocouples[1] = Thermocouple_Channel(1, 2, "K", 0.0)     # channel 1
+thermocouples[1] = Thermocouple_Channel(2, 2, "K", 0.0)     # channel 2
+thermocouples[2] = Thermocouple_Channel(3, 2, "K", 0.0)     # channel 3
+thermocouples[3] = Thermocouple_Channel(4, 2, "K", 0.0)     # channel 4
+thermocouples[4] = Thermocouple_Channel(5, 2, "K", 0.0)     # channel 5
+thermocouples[5] = Thermocouple_Channel(6, 2, "K", 0.0)     # channel 6
+thermocouples[6] = Thermocouple_Channel(7, 2, "K", 0.0)     # channel 7
+
 
 
 def write_json_files():
-	# temperature file
-	test_buffer = "["
+    ''' write thermocouple and pcb data to json file '''
 
-	for i in range(0, len(thermocouples)):
+    test_buffer = "["
 
-        	tc_type = thermocouples[i].thermocouple_type
-        	f_level = thermocouples[i].filter_level
-        	channel = thermocouples[i].channel
-        	uv      = thermocouples[i].value_uv
-        	offset  = thermocouples[i].offset
-		gain    = thermocouples[i].gain
-		tempc   = thermocouples[i].value_c
-
+    for i in range(0, len(thermocouples)):
+        c_type = thermocouples[i].thermocouple_type
+        f_level = thermocouples[i].filter_level
+        channel = thermocouples[i].channel
+        uv      = thermocouples[i].value_uv
+        offset  = thermocouples[i].offset
+        gain    = thermocouples[i].gain
+        tempc   = thermocouples[i].value_c
+        
+    test_buffer += "{\"id\": %d, \"value\": %f, \"filter_level\": %d, \"type\": \"%s\", \"offset\": %f, \"gain\": %f, \"tempc\": %f }" % (i, uv, f_level, tc_type, offset, gain, tempc)
 	
-		test_buffer += "{\"id\": %d, \"value\": %f, \"filter_level\": %d, \"type\": \"%s\", \"offset\": %f, \"gain\": %f, \"tempc\": %f }" % (i, uv, f_level, tc_type, offset, gain, tempc)
-		if (not (i >= len(thermocouples)-1)):
-			test_buffer += ","
-	test_buffer += "]"
+    test_buffer += "]" if (i == len(thermocouples) - 1) else "," # add ']' if this is the last term and ',' if it's not
 
-	f = open("thermocouples.json", "w")
-	f.write(test_buffer)
-	f.close()
+    # write to json file
+    f = open("thermocouples.json", "w")
+    f.write(test_buffer)
+    f.close()
 
 	# other info pcb etc
-	test_buffer = "["
+    test_buffer = "["
 
-	test_buffer += "{\"pcb_temp\": %f}," % ( pcb_temp )
-	test_buffer += "{\"pivdd\": %f}," % ( pi_vdd )
-	test_buffer += "{\"pivadj\": %f}," % ( vadj )
-	test_buffer += "{\"pivref\": %f}" % ( vref )
+    test_buffer += "{\"pcb_temp\": %f}," % ( pcb_temp )
+    test_buffer += "{\"pivdd\": %f}," % ( pi_vdd )
+    test_buffer += "{\"pivadj\": %f}," % ( vadj )
+    test_buffer += "{\"pivref\": %f}" % ( vref )
 
-	test_buffer += "]"
+    test_buffer += "]"
 
-	f = open("th7pcbinfo.json", "w")
-	f.write(test_buffer)
-	f.close()
+    f = open("th7pcbinfo.json", "w")
+    f.write(test_buffer)
+    f.close()
+
 
 # first order filters of varying "hardness."
 def apply_lag_filter(old_value, new_value, lag_level):
+    ''' first order filters of varying \'hardness\' '''
+
     if lag_level == 0 or lag_level == 1:
         return new_value
 
+    # BUG: This will never run!
     if lag_level == 1:
         return ( 0.9 * old_value + 0.1 * new_value )
 
@@ -201,27 +196,30 @@ def translate_celsius_to_uv(c, tc_type="K"):
 
     return -300.0
 
+
 # main "printing loop."
 old_second = datetime.datetime.now().second
 old_minute = datetime.datetime.now().minute
+
 def print_list():
 
     global logging
     global old_minute
     global old_second
     global pi_vdd
+
     dt = datetime.datetime.now()
-    print dt
+    print(f"{dt}\n")
     minute = datetime.datetime.now().minute
     st = "" 
     pi_v = 0.0
-    pi_vdd = piv = (5.0/vadj)
+    pi_vdd = piv = (5.0 / vadj) #BUG: WTF
 
     second_now = datetime.datetime.now().second
 
     if piv < 4.8 or piv > 5.3:
-         print "Voltage error\nCheck Raspberry Pi power supply."
-         return
+        print("Voltage error.\nCheck Raspberry Pi power supply.")
+        return
 
     for i in range(0, len(thermocouples)):
 
@@ -241,36 +239,39 @@ def print_list():
         uv_with_pcb = uv + translate_celsius_to_uv(pcb_temp, tc_type)
         #uv_with_pcb = uv_with_pcb + translate_uv_to_celsius( translate_celsius_to_uv(offset, tc_type), tc_type)
         
-	thermocouples[i].value_c = ( translate_uv_to_celsius(uv_with_pcb, tc_type) + offset)
-	valuec = thermocouples[i].value_c #..
+    thermocouples[i].value_c = ( translate_uv_to_celsius(uv_with_pcb, tc_type) + offset)
+    valuec = thermocouples[i].value_c #..
 
-        #print ("first_run %f"%first_run)        
-        # lowest is J type at -8095 uv, others are lower but no one will be measuring -250 oC?
-        if uv > -8100:
-            # st =  (("Channel %d: {:15.2f} uV, temp={:10.1f} oC, type=%-5s [F=%d]".format(uv, translate_uv_to_celsius(uv_with_pcb, tc_type)+offset) % (channel, tc_type, f_level)))
+    #print ("first_run %f"%first_run)        
+    # lowest is J type at -8095 uv, others are lower but no one will be measuring -250 oC?
+    if uv > -8100:
+        # st =  (("Channel %d: {:15.2f} uV, temp={:10.1f} oC, type=%-5s [F=%d]".format(uv, translate_uv_to_celsius(uv_with_pcb, tc_type)+offset) % (channel, tc_type, f_level)))
 	    st =  (("Channel %d: {:15.2f} uV, temp={:10.1f} oC, type=%-5s [F=%d]".format(uv, valuec) % (channel, tc_type, f_level)))
-	else:
-	    thermocouples[i].value_c = -300.0 # error detection !
-            st = ("Channel %d: DISCONNECT OR OPEN CIRCUIT" % channel)
+    else:
+	    
+        thermocouples[i].value_c = -300.0 # error detection !
+        st = f"Channel {channel}: DISCONNECTED OR OPEN CIRCUIT"
 
         if uv > 38000: #38mV (for G=101)
             st = ("Channel %d: ERROR HIGH" % channel)
-        print st
+
+        print(f"{st}\n")
+
         if (minute != old_minute):
             logging.info (st)
             #logging.info (dt)
 
-	if (old_second != second_now):
-            write_json_files()
-            old_second = second_now
+    if (old_second != second_now):
+        write_json_files()
+        old_second = second_now
 
     vadjst = ("vadj:    \t%2f" % (vadj))
     vadj2st =  "vadj_now: %2f  Pi Vdd %f" % (vadj_now, 5.0/vadj)
     #print "PCB_TEMP: %2f" % pcb_temp
     uvadj =  "PCB_TEMP %2foC uV:\t%2f\t(%2f C)" % (pcb_temp, translate_celsius_to_uv(pcb_temp), translate_uv_to_celsius(translate_celsius_to_uv(pcb_temp)))
-    print vadjst
-    print vadj2st
-    print uvadj
+    print(f"{vadjst}\n")
+    print(f"{vadj2st}\n")
+    print(f"{uvadj}\n")
 
     if ( minute != old_minute):
         #logging.info ( st )
@@ -280,6 +281,7 @@ def print_list():
         logging.info (dt) # 1 timestamp per "section" is enough
         old_minute = minute
 
+# -------------
 spi = spidev.SpiDev()  # spi instance to read 12 bit ADC	
 spi_tc77 = spidev.SpiDev() # spi instance to read TC77 digital temperature chip
 spi.open(0, 0)
@@ -296,7 +298,7 @@ first_run = 15
 while True:
   try:
     a = a + 1
-    if a>8:
+    if a > 8:
       os.system("clear") # this is for tunning in a terminal over ssh on a pi
       a = 0
       print_list()
@@ -310,12 +312,15 @@ while True:
 
     # calculate vref and adjustment variables
     if a == 0:
+        
         vref = resp[1] * 256.0 + resp[2] * 1.0
-        vadj_now = vref/3355.4432
+        vadj_now = vref / 3355.4432
+        
         if first_run >= 0:
             vadj = vadj_now
         vadj = vadj_now * 0.1 + vadj * 0.9
-        print "vref: ", vref, "vadj: ", vadj
+        
+        print(f"vref: {vref}, vadj: {vadj}\n")
 
     # read into thermocouple channels + apply adjustment and "lag filters"
     if a >= 1 and a < 8:
@@ -340,28 +345,30 @@ while True:
 
 
     if a == 8: # read the temperature from the tc77
-    	resp = spi_tc77.xfer2([0x00, 0x00, 0x00, 0x00]) # transfer four bytes
+    	
+        resp = spi_tc77.xfer2([0x00, 0x00, 0x00, 0x00]) # transfer four bytes
         number = resp[0] * 256 + resp[1]
+        
         if first_run >= 0:
-          first_run = first_run - 1
-	pcb_temp = (number/8.0) * 0.0625
-	print "Temp: ", pcb_temp, resp
+            first_run = first_run - 1
+	
+    pcb_temp = (number / 8.0) * 0.0625
+	
+    print(f"Temp: {pcb_temp}{resp}")
         #
         # service LED blinking
         #
-        if kk<10: 
-          GPIO.output(17,GPIO.LOW) # D3 LED ON
-          GPIO.output(22,GPIO.HIGH) # D2 LED OFF
-        else:
-          GPIO.output(17,GPIO.HIGH) # D3 LED OFF
-          GPIO.output(22,GPIO.LOW) # D2 LED ON
-        kk = kk + 1
-        if kk>20:
-           kk=0
+    if kk < 10: 
+        GPIO.output(17,GPIO.LOW) # D3 LED ON
+        GPIO.output(22,GPIO.HIGH) # D2 LED OFF
+    else:
+        GPIO.output(17,GPIO.HIGH) # D3 LED OFF
+        GPIO.output(22,GPIO.LOW) # D2 LED ON
+        
+        kk = kk + 1 if kk <= 20 else 0
 
   except KeyboardInterrupt:
   # Ctrl+C pressed, so...
     spi_tc77.close()
     spi.close() # close the ports before exit
     # close db connection
-    
